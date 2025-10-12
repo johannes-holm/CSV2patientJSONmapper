@@ -23,12 +23,16 @@ COLUMN_MAP = {
     "Initial Vitals BP": "BP",
     "Initial Vitals O2 Sat":"signs.Saturation%",
     "Initial Vitals Temperature": "signs.Temperature",
-    "Initial Vitals GCS": "GCS"
+    "Initial Vitals GCS": "GCS",
+    "Initial Vitals RESP": "signs.RespiratoryRate"
+
 }
 
 #what values the json needs anyway
 CONSTANT_FIELDS = {
-"status": "inactive"
+"status": "inactive",
+"signs.BloodGlucoseLevel":3.5
+
 }
 
 # Skip writing fields whose CSV value is empty/whitespace
@@ -50,11 +54,18 @@ def triage_to_number(val: Optional[str]) -> Optional[int]:
 
 def avpu_to_valid(avpuScore):
     avpuScore = avpuScore.upper()
-    valid_scores = ['A', 'V', 'P', 'U']
-    if avpuScore in valid_scores:
-        return avpuScore
-    else:
-        return avpuScore[0]
+    letter = avpuScore[0]
+
+    mental = (
+        "oriented" if letter == "A"
+        else "apathetic" if letter in {"V", "P"}
+        else "unresponsive"  # U
+    )
+
+    return {
+        "signs.AVPUScore": letter,
+        "signs.MentalState": mental,
+    }
     
 #Airways transform------------------------------------------------------
 def airways_to_valid(airwaysStatus):
@@ -92,6 +103,11 @@ def pulserate_to_valid(pulserate):
     pulserate = int(pulserate)
     return pulserate
 
+#resp rate transform------------------------------------------------------
+def resprate_to_valid(resp_rate):
+    resp_rate = int(resp_rate)
+    return resp_rate
+
 #saturation transform------------------------------------------------------
 def saturation_to_valid(saturation):
     saturation = int(saturation)
@@ -110,7 +126,15 @@ def split_bp(bp):
     if not m:
         return None
     systolic, diastolic = int(m.group(1)), int(m.group(2))
-    return {"signs.SystolicBP": systolic, "signs.DiastolicBP": diastolic}
+    if systolic > 90:
+        location = "radialis"
+    elif systolic > 70:
+        location = "cubitalis"
+    elif systolic >60:
+        location = "carotid"
+    else:
+        location = "nil"
+    return {"signs.SystolicBP": systolic, "signs.DiastolicBP": diastolic, "signs.PulseLocation": location}
 
 #GCS trasnform------------------------------------------------------
 def split_gcs(gcs):
@@ -121,7 +145,10 @@ def split_gcs(gcs):
     if not m:
         return None
     eye, verbal, motor = int(m.group(1)), int(m.group(2)), int(m.group(3))
-    return {"signs.eye_opening": eye, "signs.verbal_response": verbal, "signs.motor_response": motor}
+    score = eye + verbal + motor
+    return {"signs.eye_opening": eye, "signs.verbal_response": verbal, "signs.motor_response": motor, "signs.GCS": score}
+
+#
 
 
     
@@ -136,7 +163,8 @@ TRANSFORMS: Dict[str, Transform] = {
     "Initial Vitals BP": split_bp,
     "Initial Vitals O2 Sat": saturation_to_valid,
     "Initial Vitals Temperature": temperature_to_valid,
-    "Initial Vitals GCS": split_gcs
+    "Initial Vitals GCS": split_gcs,
+    "Initial Vitals RESP": resprate_to_valid
 }
     
 
